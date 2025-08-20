@@ -146,18 +146,38 @@ export function CalendarTracker() {
   // Load events for the current month and user
   useEffect(() => {
     const loadEvents = async () => {
+      const { start, end } = getMonthRange(currentDate)
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
-      const { start, end } = getMonthRange(currentDate)
-      const { data, error } = await supabase
+
+      // Load events for current month (for calendar view)
+      const { data: monthData, error: monthError } = await supabase
         .from("calendar_events")
         .select("id, title, description, start_time, end_time, location, event_type, created_at")
         .eq("user_id", user.id)
         .gte("start_time", start.toISOString())
         .lte("start_time", end.toISOString())
         .order("start_time", { ascending: true })
-      if (error || !data) return
-      const mapped: CalendarEvent[] = data.map((row: any) => {
+
+      // Load upcoming events (for dashboard display)
+      const now = new Date()
+      const { data: upcomingData, error: upcomingError } = await supabase
+        .from("calendar_events")
+        .select("id, title, description, start_time, end_time, location, event_type, created_at")
+        .eq("user_id", user.id)
+        .gte("start_time", now.toISOString())
+        .order("start_time", { ascending: true })
+        .limit(10)
+
+      if (monthError || upcomingError) return
+
+      // Combine and deduplicate events
+      const allEvents = [...(monthData || []), ...(upcomingData || [])]
+      const uniqueEvents = allEvents.filter((event, index, self) => 
+        index === self.findIndex(e => e.id === event.id)
+      )
+
+      const mapped: CalendarEvent[] = uniqueEvents.map((row: any) => {
         const startDt = new Date(row.start_time)
         const time = startDt
           .toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false })
@@ -173,6 +193,8 @@ export function CalendarTracker() {
           createdAt: new Date(row.created_at),
         }
       })
+      
+      console.log('Calendar Tracker - Loaded events:', mapped.length, 'Upcoming events:', getUpcomingEvents().length)
       setEvents(mapped)
     }
     loadEvents()

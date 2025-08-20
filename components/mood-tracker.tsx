@@ -93,13 +93,17 @@ export function MoodTracker() {
     const loadMoods = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
+
       const { data, error } = await supabase
         .from("mood_entries")
         .select("id, mood_id, note, created_at")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false })
         .limit(20)
-      if (error || !data) return
+      if (error || !data) {
+        if (error) console.error('Mood Tracker - Error loading moods:', error)
+        return
+      }
       const mapped: MoodEntry[] = data.map((row) => {
         const opt = moodOptions.find((m) => m.id === (row as any).mood_id) || moodOptions[0]
         return {
@@ -109,6 +113,7 @@ export function MoodTracker() {
           timestamp: new Date((row as any).created_at),
         }
       })
+      console.log('Mood Tracker - Loaded moods:', mapped.length, mapped)
       setMoodHistory(mapped)
     }
     loadMoods()

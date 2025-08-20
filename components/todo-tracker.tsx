@@ -2,7 +2,9 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { supabase } from "@/lib/supabase"
+import { toast } from "@/hooks/use-toast"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
@@ -45,38 +47,182 @@ export function TodoTracker() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingTodo, setEditingTodo] = useState<TodoItem | null>(null)
 
-  const handleToggleTodo = (id: string) => {
+  // Load todos from Supabase on component mount
+  useEffect(() => {
+    const loadTodos = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const { data, error } = await supabase
+        .from("todos")
+        .select("id, title, description, category, priority, status, due_date, created_at, completed_at")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(100)
+
+      if (!error && data) {
+        const mapped: TodoItem[] = data.map((row: any) => ({
+          id: row.id,
+          title: row.title,
+          description: row.description || "",
+          category: row.category || "other",
+          priority: row.priority,
+          completed: row.status === 'completed',
+          dueDate: row.due_date || undefined,
+          createdAt: new Date(row.created_at),
+          completedAt: row.completed_at ? new Date(row.completed_at) : undefined,
+        }))
+        console.log('Todo Tracker - Loaded todos:', mapped.length, mapped)
+        setTodos(mapped)
+      } else if (error) {
+        console.error('Todo Tracker - Error loading todos:', error)
+      }
+    }
+    loadTodos()
+  }, [])
+
+  const handleToggleTodo = async (id: string) => {
+    const todo = todos.find(t => t.id === id)
+    if (!todo) return
+
+    const newCompleted = !todo.completed
+    const newCompletedAt = newCompleted ? new Date() : undefined
+
+    // Update local state immediately
     setTodos(
       todos.map((todo) =>
         todo.id === id
           ? {
               ...todo,
-              completed: !todo.completed,
-              completedAt: !todo.completed ? new Date() : undefined,
+              completed: newCompleted,
+              completedAt: newCompletedAt,
             }
           : todo,
       ),
     )
-  }
 
-  const handleSaveTodo = (todoData: Omit<TodoItem, "id" | "createdAt" | "completed" | "completedAt">) => {
-    if (editingTodo) {
-      setTodos(todos.map((todo) => (todo.id === editingTodo.id ? { ...todo, ...todoData } : todo)))
-      setEditingTodo(null)
-    } else {
-      const newTodo: TodoItem = {
-        ...todoData,
-        id: Date.now().toString(),
-        completed: false,
-        createdAt: new Date(),
+    // Persist to Supabase
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        toast({ title: "Cloud sync skipped", description: "Sign in to sync to cloud." })
+        return
       }
-      setTodos([...todos, newTodo])
-      setIsDialogOpen(false)
+
+      const { error } = await supabase
+        .from("todos")
+        .update({
+          status: newCompleted ? 'completed' : 'pending',
+          completed_at: newCompletedAt?.toISOString() || null,
+        })
+        .eq("id", id)
+        .eq("user_id", user.id)
+
+      if (!error) {
+        toast({ title: "Saved to cloud", description: "Todo status synced." })
+      } else {
+        toast({ title: "Cloud sync failed", description: error.message, variant: "destructive" })
+      }
+    } catch (err) {
+      toast({ title: "Cloud sync skipped", description: "Sign in to sync to cloud." })
     }
   }
 
-  const handleDeleteTodo = (id: string) => {
+  const handleSaveTodo = async (todoData: Omit<TodoItem, "id" | "createdAt" | "completed" | "completedAt">) => {
+    try {
+      const coupleId = typeof window !== "undefined" ? localStorage.getItem("couple_id") : null
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        toast({ title: "Sign in required", description: "Please sign in to save todos.", variant: "destructive" })
+        return
+      }
+
+      if (editingTodo) {
+        // Update existing todo
+        const { error } = await supabase
+          .from("todos")
+          .update({
+            title: todoData.title,
+            description: todoData.description || null,
+            category: todoData.category,
+            priority: todoData.priority,
+            due_date: todoData.dueDate ? new Date(todoData.dueDate).toISOString().slice(0, 10) : null,
+          })
+          .eq("id", editingTodo.id)
+
+        if (error) {
+          toast({ title: "Update failed", description: error.message, variant: "destructive" })
+          return
+        }
+
+        // Update local state
+        setTodos(todos.map((todo) => (todo.id === editingTodo.id ? { ...todo, ...todoData } : todo)))
+        setEditingTodo(null)
+        toast({ title: "Todo updated", description: "Changes saved to cloud." })
+      } else {
+        // Create new todo
+        const { data, error } = await supabase
+          .from("todos")
+          .insert({
+            couple_id: coupleId ?? null,
+            user_id: user.id,
+            title: todoData.title,
+            description: todoData.description || null,
+            category: todoData.category,
+            priority: todoData.priority,
+            due_date: todoData.dueDate ? new Date(todoData.dueDate).toISOString().slice(0, 10) : null,
+            status: 'pending',
+          })
+          .select("id, created_at")
+          .single()
+
+        if (error || !data) {
+          toast({ title: "Save failed", description: error?.message || "Unknown error", variant: "destructive" })
+          return
+        }
+
+        // Add to local state with database ID
+        const newTodo: TodoItem = {
+          ...todoData,
+          id: data.id,
+          completed: false,
+          createdAt: new Date(data.created_at),
+        }
+        setTodos([...todos, newTodo])
+        setIsDialogOpen(false)
+        toast({ title: "Todo added", description: "Task saved to cloud." })
+      }
+    } catch (err) {
+      toast({ title: "Cloud sync failed", description: "Sign in to sync to cloud.", variant: "destructive" })
+    }
+  }
+
+  const handleDeleteTodo = async (id: string) => {
+    // Remove from local state immediately
     setTodos(todos.filter((todo) => todo.id !== id))
+
+    // Remove from Supabase
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        toast({ title: "Cloud sync skipped", description: "Sign in to sync to cloud." })
+        return
+      }
+
+      const { error } = await supabase
+        .from("todos")
+        .delete()
+        .eq("id", id)
+        .eq("user_id", user.id)
+
+      if (!error) {
+        toast({ title: "Todo deleted", description: "Task removed from cloud." })
+      } else {
+        toast({ title: "Cloud sync failed", description: error.message, variant: "destructive" })
+      }
+    } catch (err) {
+      toast({ title: "Cloud sync skipped", description: "Sign in to sync to cloud." })
+    }
   }
 
   const activeTodos = todos.filter((todo) => !todo.completed)
@@ -94,40 +240,74 @@ export function TodoTracker() {
               Small Steps
             </div>
             <Badge variant="secondary" className="text-xs">
-              {completedTodos.length}/{todos.length} done
+              {completedTodos.length}/{todos.length} completed
             </Badge>
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          {todaysTodos.length > 0 ? (
-            todaysTodos.map((todo) => {
-              const category = todoCategories.find((c) => c.value === todo.category)
-              return (
-                <div key={todo.id} className="flex items-center gap-3">
-                  <button
-                    onClick={() => handleToggleTodo(todo.id)}
-                    className="flex-shrink-0 transition-colors hover:scale-110"
-                  >
-                    {todo.completed ? (
-                      <CheckCircle2 className="w-4 h-4 text-green-500" />
-                    ) : (
-                      <Circle className="w-4 h-4 text-muted-foreground hover:text-primary" />
-                    )}
-                  </button>
-                  <div className="flex-1">
-                    <div
-                      className={`text-sm font-medium ${todo.completed ? "line-through text-muted-foreground" : ""}`}
+          {/* Active Todos */}
+          {todaysTodos.length > 0 && (
+            <div>
+              <h4 className="text-xs font-medium text-muted-foreground mb-2">Active Steps</h4>
+              {todaysTodos.map((todo) => {
+                const category = todoCategories.find((c) => c.value === todo.category)
+                return (
+                  <div key={todo.id} className="flex items-center gap-3">
+                    <button
+                      onClick={() => handleToggleTodo(todo.id)}
+                      className="flex-shrink-0 transition-colors hover:scale-110"
                     >
-                      {todo.title}
+                      {todo.completed ? (
+                        <CheckCircle2 className="w-4 h-4 text-green-500" />
+                      ) : (
+                        <Circle className="w-4 h-4 text-muted-foreground hover:text-primary" />
+                      )}
+                    </button>
+                    <div className="flex-1">
+                      <div
+                        className={`text-sm font-medium ${todo.completed ? "line-through text-muted-foreground" : ""}`}
+                      >
+                        {todo.title}
+                      </div>
+                      {todo.description && <div className="text-xs text-muted-foreground">{todo.description}</div>}
                     </div>
-                    {todo.description && <div className="text-xs text-muted-foreground">{todo.description}</div>}
+                    <div className={`w-3 h-3 rounded-full ${category?.dot}`} />
                   </div>
-                  <div className={`w-3 h-3 rounded-full ${category?.dot}`} />
-                </div>
-              )
-            })
-          ) : (
-            <p className="text-sm text-muted-foreground text-center py-2">All caught up! Great job!</p>
+                )
+              })}
+            </div>
+          )}
+
+          {/* Completed Todos */}
+          {completedTodos.length > 0 && (
+            <div>
+              <h4 className="text-xs font-medium text-muted-foreground mb-2">Completed Today</h4>
+              {completedTodos.slice(0, 2).map((todo) => {
+                const category = todoCategories.find((c) => c.value === todo.category)
+                return (
+                  <div key={todo.id} className="flex items-center gap-3 opacity-75">
+                    <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0" />
+                    <div className="flex-1">
+                      <div className="text-sm font-medium line-through text-muted-foreground">
+                        {todo.title}
+                      </div>
+                      {todo.description && <div className="text-xs text-muted-foreground">{todo.description}</div>}
+                    </div>
+                    <div className={`w-3 h-3 rounded-full ${category?.dot}`} />
+                  </div>
+                )
+              })}
+              {completedTodos.length > 2 && (
+                <p className="text-xs text-muted-foreground text-center mt-2">
+                  +{completedTodos.length - 2} more completed
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* No todos message */}
+          {todos.length === 0 && (
+            <p className="text-sm text-muted-foreground text-center py-2">No tasks yet. Add your first step!</p>
           )}
 
           <Dialog>

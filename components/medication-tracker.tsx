@@ -205,6 +205,7 @@ export function MedicationTracker() {
     const loadMeds = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
+
       const { data, error } = await supabase
         .from("medications")
         .select("id, name, dosage, frequency, times, color, notes, created_at")

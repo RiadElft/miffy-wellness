@@ -55,11 +55,25 @@ export function SleepTracker() {
 
   const [isDialogOpen, setIsDialogOpen] = useState(false)
 
+  // Helper function to remove duplicates
+  const removeDuplicates = (entries: SleepEntry[]): SleepEntry[] => {
+    const seen = new Set()
+    return entries.filter(entry => {
+      if (seen.has(entry.id)) {
+        console.warn('Duplicate sleep entry found:', entry.id)
+        return false
+      }
+      seen.add(entry.id)
+      return true
+    })
+  }
+
   // Load recent sleep entries from Supabase
   useEffect(() => {
     const loadSleeps = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
+
       const { data, error } = await supabase
         .from("sleep_entries")
         .select("id, date, bedtime, wake_time, quality, duration, notes, created_at")
@@ -77,7 +91,14 @@ export function SleepTracker() {
         notes: row.notes || "",
         createdAt: new Date(row.created_at),
       }))
-      setSleepEntries(mapped)
+      
+      // Remove any duplicates by ID (failsafe)
+      const uniqueEntries = mapped.filter((entry, index, self) => 
+        index === self.findIndex(e => e.id === entry.id)
+      )
+      
+      console.log('Sleep Tracker - Loaded entries:', uniqueEntries.length, uniqueEntries)
+      setSleepEntries(uniqueEntries)
     }
     loadSleeps()
   }, [])
@@ -100,38 +121,85 @@ export function SleepTracker() {
 
   const handleSaveSleep = async (sleepData: Omit<SleepEntry, "id" | "createdAt" | "duration">) => {
     const duration = calculateDuration(sleepData.bedtime, sleepData.wakeTime)
-    const newEntry: SleepEntry = {
-      ...sleepData,
-      id: Date.now().toString(),
-      duration,
-      createdAt: new Date(),
-    }
-
-    setSleepEntries([newEntry, ...sleepEntries])
-    // Cloud persist
+    const sleepDate = new Date(sleepData.date).toISOString().slice(0, 10)
+    
+    // Cloud persist first to get the actual ID
     try {
       const coupleId = typeof window !== "undefined" ? localStorage.getItem("couple_id") : null
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
         toast({ title: "Cloud sync skipped", description: "Sign in to sync to cloud." })
-        throw new Error("missing_user")
+        return
       }
-      const { error } = await supabase.from("sleep_entries").insert({
-        couple_id: coupleId ?? null,
-        user_id: user.id,
-        date: new Date(sleepData.date).toISOString().slice(0,10),
-        bedtime: sleepData.bedtime,
-        wake_time: sleepData.wakeTime,
-        quality: sleepData.quality,
-        duration,
-        notes: sleepData.notes ?? null,
-      })
-      if (!error) {
-        toast({ title: "Saved to cloud", description: "Sleep entry synced." })
+
+      // Check if entry exists for this date
+      const { data: existing } = await supabase
+        .from("sleep_entries")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("date", sleepDate)
+        .single()
+
+      let result
+      if (existing) {
+        // Update existing entry
+        result = await supabase
+          .from("sleep_entries")
+          .update({
+            bedtime: sleepData.bedtime,
+            wake_time: sleepData.wakeTime,
+            quality: sleepData.quality,
+            duration,
+            notes: sleepData.notes ?? null,
+          })
+          .eq("id", existing.id)
+          .select("id, created_at")
+          .single()
       } else {
-        toast({ title: "Cloud sync failed", description: error.message, variant: "destructive" })
+        // Insert new entry
+        result = await supabase
+          .from("sleep_entries")
+          .insert({
+            couple_id: coupleId ?? null,
+            user_id: user.id,
+            date: sleepDate,
+            bedtime: sleepData.bedtime,
+            wake_time: sleepData.wakeTime,
+            quality: sleepData.quality,
+            duration,
+            notes: sleepData.notes ?? null,
+          })
+          .select("id, created_at")
+          .single()
       }
-    } catch {}
+
+      if (!result.error && result.data) {
+        // Update local state
+        const newEntry: SleepEntry = {
+          ...sleepData,
+          id: result.data.id,
+          duration,
+          createdAt: new Date(result.data.created_at),
+        }
+
+        // Update local state properly - remove duplicates by ID and date
+        setSleepEntries(prevEntries => {
+          // Remove any existing entry with the same ID or date
+          const filtered = prevEntries.filter(entry => 
+            entry.id !== result.data.id && 
+            new Date(entry.date).toDateString() !== new Date(sleepData.date).toDateString()
+          )
+          const newEntries = [newEntry, ...filtered].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+          return removeDuplicates(newEntries)
+        })
+        
+        toast({ title: "Saved to cloud", description: existing ? "Sleep entry updated." : "Sleep entry synced." })
+      } else {
+        toast({ title: "Cloud sync failed", description: result.error?.message || "Unknown error", variant: "destructive" })
+      }
+    } catch (err) {
+      toast({ title: "Cloud sync failed", description: "Please try again.", variant: "destructive" })
+    }
     setIsDialogOpen(false)
   }
 
@@ -170,7 +238,7 @@ export function SleepTracker() {
                     Update Sleep
                   </Button>
                 </DialogTrigger>
-                <SleepDialog onSave={handleSaveSleep} />
+                <SleepDialog onSave={handleSaveSleep} existingEntry={todaysSleep} />
               </Dialog>
             </div>
           ) : (
@@ -229,9 +297,9 @@ export function SleepTracker() {
                 Recent Rest
               </h3>
               <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-                {sleepEntries.slice(0, 6).map((entry) => (
+                {sleepEntries.slice(0, 6).map((entry, index) => (
                   <div
-                    key={entry.id}
+                    key={`${entry.id}-${entry.date}-${index}`}
                     className="p-4 rounded-lg border bg-gradient-to-br from-blue-50/50 to-purple-50/50 border-blue-100"
                   >
                     <div className="flex items-center justify-between mb-2">
@@ -265,13 +333,19 @@ export function SleepTracker() {
   )
 }
 
-function SleepDialog({ onSave }: { onSave: (sleepData: Omit<SleepEntry, "id" | "createdAt" | "duration">) => void }) {
+function SleepDialog({ 
+  onSave, 
+  existingEntry 
+}: { 
+  onSave: (sleepData: Omit<SleepEntry, "id" | "createdAt" | "duration">) => void
+  existingEntry?: SleepEntry
+}) {
   const [formData, setFormData] = useState({
-    date: new Date().toDateString(),
-    bedtime: "22:00",
-    wakeTime: "07:00",
-    quality: 3,
-    notes: "",
+    date: existingEntry?.date || new Date().toDateString(),
+    bedtime: existingEntry?.bedtime || "22:00",
+    wakeTime: existingEntry?.wakeTime || "07:00",
+    quality: existingEntry?.quality || 3,
+    notes: existingEntry?.notes || "",
   })
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -299,7 +373,9 @@ function SleepDialog({ onSave }: { onSave: (sleepData: Omit<SleepEntry, "id" | "
   return (
     <DialogContent className="max-w-md">
       <DialogHeader>
-        <DialogTitle className="text-center">How did you rest?</DialogTitle>
+        <DialogTitle className="text-center">
+          {existingEntry ? "Update Your Sleep" : "How did you rest?"}
+        </DialogTitle>
       </DialogHeader>
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Date */}
@@ -393,7 +469,7 @@ function SleepDialog({ onSave }: { onSave: (sleepData: Omit<SleepEntry, "id" | "
 
         {/* Save Button */}
         <Button type="submit" className="w-full" size="lg">
-          Save My Rest
+          {existingEntry ? "Update Sleep Entry" : "Save My Rest"}
         </Button>
       </form>
     </DialogContent>
