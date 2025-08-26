@@ -44,7 +44,7 @@ export default function WeatherParticles({ mood, className }: WeatherParticlesPr
           shape: { type: "circle" },
           opacity: { value: { min: 0.4, max: 0.8 } },
           size: { value: { min: 2, max: 4 } },
-          move: { enable: true, speed: 1, direction: "top", outModes: { default: "out" } },
+          move: { enable: true, speed: 1, direction: "top" as const, outModes: { default: "out" as const } },
         },
       },
       "partly-cloudy": {
@@ -54,7 +54,7 @@ export default function WeatherParticles({ mood, className }: WeatherParticlesPr
           shape: { type: "circle" },
           opacity: { value: 0.3 },
           size: { value: { min: 20, max: 60 } },
-          move: { enable: true, speed: 0.2, direction: "right", outModes: { default: "out" } },
+          move: { enable: true, speed: 0.2, direction: "right" as const, outModes: { default: "out" as const } },
         },
       },
       cloudy: {
@@ -64,7 +64,7 @@ export default function WeatherParticles({ mood, className }: WeatherParticlesPr
           shape: { type: "circle" },
           opacity: { value: 0.25 },
           size: { value: { min: 30, max: 80 } },
-          move: { enable: true, speed: 0.15, direction: "right", outModes: { default: "out" } },
+          move: { enable: true, speed: 0.15, direction: "right" as const, outModes: { default: "out" as const } },
         },
       },
       rainy: {
@@ -74,7 +74,7 @@ export default function WeatherParticles({ mood, className }: WeatherParticlesPr
           shape: { type: "line" },
           opacity: { value: 0.6 },
           size: { value: { min: 15, max: 25 } },
-          move: { enable: true, speed: 10, direction: "bottom", outModes: { default: "out" } },
+          move: { enable: true, speed: 10, direction: "bottom" as const, outModes: { default: "out" as const } },
         },
       },
       stormy: {
@@ -84,7 +84,7 @@ export default function WeatherParticles({ mood, className }: WeatherParticlesPr
           shape: { type: "line" },
           opacity: { value: 0.7 },
           size: { value: { min: 20, max: 30 } },
-          move: { enable: true, speed: 12, direction: "bottom", outModes: { default: "out" } },
+          move: { enable: true, speed: 12, direction: "bottom" as const, outModes: { default: "out" as const } },
         },
       },
       rainbow: {
@@ -94,7 +94,7 @@ export default function WeatherParticles({ mood, className }: WeatherParticlesPr
           shape: { type: "circle" },
           opacity: { value: 0.6 },
           size: { value: { min: 3, max: 5 } },
-          move: { enable: true, speed: 1, direction: "top", outModes: { default: "out" } },
+          move: { enable: true, speed: 1, direction: "top" as const, outModes: { default: "out" as const } },
         },
       },
       starry: {
@@ -104,7 +104,7 @@ export default function WeatherParticles({ mood, className }: WeatherParticlesPr
           shape: { type: "star" },
           opacity: { value: { min: 0.3, max: 0.9 } },
           size: { value: { min: 1, max: 3 } },
-          move: { enable: true, speed: 0.1, direction: "none", outModes: { default: "out" } },
+          move: { enable: true, speed: 0.1, direction: "none" as const, outModes: { default: "out" as const } },
         },
       },
     }

@@ -84,7 +84,7 @@ interface MoodEntry {
 
 export function MoodTracker({ isDashboard = false }: { isDashboard?: boolean }) {
   const [moodHistory, setMoodHistory] = useState<MoodEntry[]>([])
-  const [selectedMood, setSelectedMood] = useState<MoodOption | null>(null)
+  const [selectedMood, setSelectedMood] = useState<(typeof moodOptions)[0] | null>(null)
   const [note, setNote] = useState("")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingEntry, setEditingEntry] = useState<MoodEntry | null>(null)
@@ -285,7 +285,7 @@ export function MoodTracker({ isDashboard = false }: { isDashboard?: boolean }) 
                       note={note}
                       onMoodSelect={handleMoodSelect}
                       onNoteChange={setNote}
-                      onSave={() => handleSaveMood(editingEntry)}
+                      onSave={() => handleSaveMood(editingEntry || undefined)}
                     />
                   </Dialog>
                 </>

@@ -9,7 +9,7 @@ interface WeatherOverlayProps {
 
 export default function WeatherOverlay({ mood, className }: WeatherOverlayProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const animationRef = useRef<number>()
+  const animationRef = useRef<number | undefined>(undefined)
   const [lightningVisible, setLightningVisible] = useState(false)
   const lastLightningRef = useRef(0)
 
