@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
-import { Heart, Calendar } from "lucide-react"
+import { Heart, Calendar, Edit, Trash2 } from "lucide-react"
 
 const moodOptions: Array<{
   id: string
@@ -82,11 +82,12 @@ interface MoodEntry {
   timestamp: Date
 }
 
-export function MoodTracker() {
-  const [selectedMood, setSelectedMood] = useState<(typeof moodOptions)[0] | null>(null)
-  const [note, setNote] = useState("")
+export function MoodTracker({ isDashboard = false }: { isDashboard?: boolean }) {
   const [moodHistory, setMoodHistory] = useState<MoodEntry[]>([])
+  const [selectedMood, setSelectedMood] = useState<MoodOption | null>(null)
+  const [note, setNote] = useState("")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [editingEntry, setEditingEntry] = useState<MoodEntry | null>(null)
 
   // Load recent moods from Supabase
   useEffect(() => {
@@ -123,17 +124,21 @@ export function MoodTracker() {
     setSelectedMood(mood)
   }
 
-  const handleSaveMood = async () => {
+  const handleSaveMood = async (editingEntry?: MoodEntry) => {
     if (!selectedMood) return
 
     const newEntry: MoodEntry = {
-      id: Date.now().toString(),
+      id: editingEntry?.id || Date.now().toString(),
       mood: selectedMood,
       note,
-      timestamp: new Date(),
+      timestamp: editingEntry?.timestamp || new Date(),
     }
 
-    setMoodHistory([newEntry, ...moodHistory])
+    if (editingEntry) {
+      setMoodHistory(moodHistory.map(entry => entry.id === editingEntry.id ? newEntry : entry))
+    } else {
+      setMoodHistory([newEntry, ...moodHistory])
+    }
 
     // Cloud persist if linked and authenticated
     try {
@@ -143,17 +148,38 @@ export function MoodTracker() {
         toast({ title: "Cloud sync skipped", description: "Sign in to sync to cloud." })
         throw new Error("missing_user")
       }
-      const { error } = await supabase.from("mood_entries").insert({
-        couple_id: coupleId ?? null,
-        user_id: user.id,
-        score: selectedMood.value,
-        mood_id: selectedMood.id,
-        note,
-      })
-      if (!error) {
-        toast({ title: "Saved to cloud", description: "Mood entry synced." })
+      
+      if (editingEntry) {
+        // Update existing entry
+        const { error } = await supabase
+          .from("mood_entries")
+          .update({
+            score: selectedMood.value,
+            mood_id: selectedMood.id,
+            note,
+          })
+          .eq("id", editingEntry.id)
+          .eq("user_id", user.id)
+        
+        if (!error) {
+          toast({ title: "Saved to cloud", description: "Mood entry updated." })
+        } else {
+          toast({ title: "Cloud sync failed", description: error.message, variant: "destructive" })
+        }
       } else {
-        toast({ title: "Cloud sync failed", description: error.message, variant: "destructive" })
+        // Insert new entry
+        const { error } = await supabase.from("mood_entries").insert({
+          couple_id: coupleId ?? null,
+          user_id: user.id,
+          score: selectedMood.value,
+          mood_id: selectedMood.id,
+          note,
+        })
+        if (!error) {
+          toast({ title: "Saved to cloud", description: "Mood entry synced." })
+        } else {
+          toast({ title: "Cloud sync failed", description: error.message, variant: "destructive" })
+        }
       }
     } catch (err) {
       // ignore cloud errors for now; local UI remains responsive
@@ -161,107 +187,211 @@ export function MoodTracker() {
     setNote("")
     setSelectedMood(null)
     setIsDialogOpen(false)
+    setEditingEntry(null)
+  }
+
+  const handleDeleteMood = async (entry: MoodEntry) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        toast({ title: "Cloud sync skipped", description: "Sign in to sync to cloud." })
+        return
+      }
+
+      const { error } = await supabase
+        .from("mood_entries")
+        .delete()
+        .eq("id", entry.id)
+        .eq("user_id", user.id)
+
+      if (!error) {
+        setMoodHistory(prev => prev.filter(e => e.id !== entry.id))
+        toast({ title: "Mood entry deleted", description: "Entry removed from cloud." })
+      } else {
+        toast({ title: "Cloud sync failed", description: error.message, variant: "destructive" })
+      }
+    } catch (err) {
+      toast({ title: "Cloud sync skipped", description: "Sign in to sync to cloud." })
+    }
   }
 
   const todaysMood = moodHistory.find((entry) => entry.timestamp.toDateString() === new Date().toDateString())
 
   return (
     <>
-      {/* Main Mood Card */}
-      <Card className="md:col-span-2 lg:col-span-1 bg-gradient-to-br from-primary/10 to-accent/10 border-primary/20 hover:shadow-lg transition-all duration-300">
-        <CardHeader className="text-center">
-          <CardTitle className="flex items-center justify-center gap-2">
-            <Heart className="w-5 h-5 text-primary" />
-            How's your sky today?
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="text-center space-y-4">
-          {todaysMood ? (
-            <>
-              <div className="text-6xl animate-bounce-gentle">{todaysMood.mood.icon}</div>
-              <div>
-                <p className="font-medium text-primary">{todaysMood.mood.name}</p>
-                <p className="text-sm text-muted-foreground">{todaysMood.mood.description}</p>
-                {todaysMood.note && <p className="text-xs text-muted-foreground mt-2 italic">"{todaysMood.note}"</p>}
-              </div>
-              <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button variant="outline" className="w-full bg-transparent">
-                    Update Mood
-                  </Button>
-                </DialogTrigger>
-                <MoodDialog
-                  moodOptions={moodOptions}
-                  selectedMood={selectedMood}
-                  note={note}
-                  onMoodSelect={handleMoodSelect}
-                  onNoteChange={setNote}
-                  onSave={handleSaveMood}
-                />
-              </Dialog>
-            </>
-          ) : (
-            <>
-              <div className="text-6xl opacity-50">☁️</div>
-              <p className="text-muted-foreground">Ready to check in with yourself?</p>
-              <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button className="w-full">Log Your Mood</Button>
-                </DialogTrigger>
-                <MoodDialog
-                  moodOptions={moodOptions}
-                  selectedMood={selectedMood}
-                  note={note}
-                  onMoodSelect={handleMoodSelect}
-                  onNoteChange={setNote}
-                  onSave={handleSaveMood}
-                />
-              </Dialog>
-            </>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Mood History Card */}
-      {moodHistory.length > 0 && (
-        <Card className="md:col-span-2 lg:col-span-3 hover:shadow-lg transition-shadow">
+      {isDashboard ? (
+        /* Dashboard Overview Only */
+        <Card className="hover:shadow-lg transition-shadow">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Calendar className="w-5 h-5 text-accent" />
-              Your Mood Garden
+              <Heart className="w-5 h-5 text-primary" />
+              How's your sky today?
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-              {moodHistory.slice(0, 6).map((entry) => (
-                <div
-                  key={entry.id}
-                  className={`p-3 rounded-lg bg-gradient-to-r ${entry.mood.color} border border-white/50`}
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="text-2xl">{entry.mood.icon}</span>
-                    <div className="flex-1">
-                      <p className="font-medium text-sm">{entry.mood.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {entry.timestamp.toLocaleDateString()} at{" "}
-                        {entry.timestamp.toLocaleTimeString([], {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </p>
-                      {entry.note && <p className="text-xs mt-1 italic">"{entry.note}"</p>}
-                    </div>
+          <CardContent className="space-y-4">
+            {/* Today's Mood */}
+            <div className="text-center space-y-4">
+              {todaysMood ? (
+                <>
+                  <div className="text-6xl animate-bounce-gentle">{todaysMood.mood.icon}</div>
+                  <div>
+                    <p className="font-medium text-primary">{todaysMood.mood.name}</p>
+                    <p className="text-sm text-muted-foreground">{todaysMood.mood.description}</p>
+                    {todaysMood.note && <p className="text-sm text-muted-foreground mt-2 italic font-medium">"{todaysMood.note}"</p>}
                   </div>
-                </div>
-              ))}
+                  <Button variant="outline" className="w-full bg-transparent">
+                    View Mood Details
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <div className="text-6xl opacity-50">☁️</div>
+                  <p className="text-muted-foreground">No mood logged today</p>
+                  <Button className="w-full">Log Your Mood</Button>
+                </>
+              )}
             </div>
-            {moodHistory.length > 6 && (
-              <Button variant="outline" className="w-full mt-4 bg-transparent">
-                View All Entries ({moodHistory.length})
-              </Button>
-            )}
           </CardContent>
         </Card>
+      ) : (
+        /* Full Functionality */
+        <>
+          {/* Main Mood Card */}
+          <Card className="md:col-span-2 lg:col-span-1 bg-gradient-to-br from-primary/10 to-accent/10 border-primary/20 hover:shadow-lg transition-all duration-300">
+            <CardHeader className="text-center">
+              <CardTitle className="flex items-center justify-center gap-2">
+                <Heart className="w-5 h-5 text-primary" />
+                How's your sky today?
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="text-center space-y-4">
+              {todaysMood ? (
+                <>
+                  <div className="text-6xl animate-bounce-gentle">{todaysMood.mood.icon}</div>
+                  <div>
+                    <p className="font-medium text-primary">{todaysMood.mood.name}</p>
+                    <p className="text-sm text-muted-foreground">{todaysMood.mood.description}</p>
+                    {todaysMood.note && <p className="text-sm text-muted-foreground mt-2 italic font-medium">"{todaysMood.note}"</p>}
+                  </div>
+                  <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" className="w-full bg-transparent">
+                        Update Mood
+                      </Button>
+                    </DialogTrigger>
+                    <MoodDialog
+                      moodOptions={moodOptions}
+                      selectedMood={selectedMood}
+                      note={note}
+                      onMoodSelect={handleMoodSelect}
+                      onNoteChange={setNote}
+                      onSave={() => handleSaveMood(editingEntry)}
+                    />
+                  </Dialog>
+                </>
+              ) : (
+                <>
+                  <div className="text-6xl opacity-50">☁️</div>
+                  <p className="text-muted-foreground">Ready to check in with yourself?</p>
+                  <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button className="w-full">Log Your Mood</Button>
+                    </DialogTrigger>
+                    <MoodDialog
+                      moodOptions={moodOptions}
+                      selectedMood={selectedMood}
+                      note={note}
+                      onMoodSelect={handleMoodSelect}
+                      onNoteChange={setNote}
+                      onSave={() => handleSaveMood()}
+                    />
+                  </Dialog>
+                </>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Mood History Card */}
+          {moodHistory.length > 0 && (
+            <Card className="md:col-span-2 lg:col-span-3 hover:shadow-lg transition-shadow">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Calendar className="w-5 h-5 text-accent" />
+                  Your Mood Garden
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                  {moodHistory.slice(0, 6).map((entry) => (
+                    <div
+                      key={entry.id}
+                      className={`p-3 rounded-lg bg-gradient-to-r ${entry.mood.color} border border-white/50 relative group`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="text-2xl">{entry.mood.icon}</span>
+                        <div className="flex-1">
+                          <p className="font-medium text-sm">{entry.mood.name}</p>
+                          <p className="text-sm text-muted-foreground font-medium">
+                            {entry.timestamp.toLocaleDateString()} at{" "}
+                            {entry.timestamp.toLocaleTimeString([], {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </p>
+                          {entry.note && <p className="text-xs mt-1 italic">"{entry.note}"</p>}
+                        </div>
+                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => {
+                              setSelectedMood(entry.mood)
+                              setNote(entry.note)
+                              setEditingEntry(entry)
+                              setIsDialogOpen(true)
+                            }}
+                            className="h-6 w-6 p-0 bg-white/20 hover:bg-white/30"
+                            title="Edit mood entry"
+                          >
+                            <Edit className="w-3 h-3" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleDeleteMood(entry)}
+                            className="h-6 w-6 p-0 bg-white/20 hover:bg-white/30 text-destructive hover:text-destructive"
+                            title="Delete mood entry"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {moodHistory.length > 6 && (
+                  <Button variant="outline" className="w-full mt-4 bg-transparent">
+                    View All Entries ({moodHistory.length})
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Edit Mood Dialog */}
+          {editingEntry && (
+            <Dialog open={!!editingEntry} onOpenChange={() => setEditingEntry(null)}>
+              <MoodDialog
+                moodOptions={moodOptions}
+                selectedMood={selectedMood}
+                note={note}
+                onMoodSelect={handleMoodSelect}
+                onNoteChange={setNote}
+                onSave={() => handleSaveMood(editingEntry)}
+              />
+            </Dialog>
+          )}
+        </>
       )}
     </>
   )

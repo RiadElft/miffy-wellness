@@ -248,7 +248,7 @@ export function TodoTracker() {
           {/* Active Todos */}
           {todaysTodos.length > 0 && (
             <div>
-              <h4 className="text-xs font-medium text-muted-foreground mb-2">Active Steps</h4>
+                                <h4 className="text-sm font-semibold text-muted-foreground mb-3">Active Steps</h4>
               {todaysTodos.map((todo) => {
                 const category = todoCategories.find((c) => c.value === todo.category)
                 return (
@@ -258,7 +258,7 @@ export function TodoTracker() {
                       className="flex-shrink-0 transition-colors hover:scale-110"
                     >
                       {todo.completed ? (
-                        <CheckCircle2 className="w-4 h-4 text-green-500" />
+                        <CheckCircle2 className="w-4 h-4 text-primary" />
                       ) : (
                         <Circle className="w-4 h-4 text-muted-foreground hover:text-primary" />
                       )}
@@ -281,12 +281,12 @@ export function TodoTracker() {
           {/* Completed Todos */}
           {completedTodos.length > 0 && (
             <div>
-              <h4 className="text-xs font-medium text-muted-foreground mb-2">Completed Today</h4>
+                                <h4 className="text-sm font-semibold text-muted-foreground mb-3">Completed Today</h4>
               {completedTodos.slice(0, 2).map((todo) => {
                 const category = todoCategories.find((c) => c.value === todo.category)
                 return (
                   <div key={todo.id} className="flex items-center gap-3 opacity-75">
-                    <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0" />
+                    <CheckCircle2 className="w-4 h-4 text-primary flex-shrink-0" />
                     <div className="flex-1">
                       <div className="text-sm font-medium line-through text-muted-foreground">
                         {todo.title}
@@ -405,12 +405,12 @@ function TodoCard({
 
   return (
     <Card
-      className={`p-4 transition-all ${todo.completed ? "bg-green-50 border-green-200" : ""} ${isOverdue ? "border-red-200 bg-red-50" : ""}`}
+                      className={`p-4 transition-all ${todo.completed ? "bg-primary/5 border-primary/20" : ""} ${isOverdue ? "border-destructive/20 bg-destructive/5" : ""}`}
     >
       <div className="flex items-start gap-3">
         <button onClick={() => onToggle(todo.id)} className="flex-shrink-0 mt-1 transition-colors hover:scale-110">
           {todo.completed ? (
-            <CheckCircle2 className="w-5 h-5 text-green-500" />
+                            <CheckCircle2 className="w-5 h-5 text-primary" />
           ) : (
             <Circle className="w-5 h-5 text-muted-foreground hover:text-primary" />
           )}
@@ -432,13 +432,13 @@ function TodoCard({
               {todo.priority}
             </Badge>
             {todo.dueDate && (
-              <Badge variant="secondary" className={`text-xs ${isOverdue ? "bg-red-100 text-red-700" : ""}`}>
+                              <Badge variant="secondary" className={`text-xs ${isOverdue ? "bg-destructive/10 text-destructive" : ""}`}>
                 Due {new Date(todo.dueDate).toLocaleDateString()}
               </Badge>
             )}
           </div>
           {todo.completedAt && (
-            <p className="text-xs text-green-600 mt-1">Completed {todo.completedAt.toLocaleDateString()}</p>
+                            <p className="text-xs text-primary mt-1">Completed {todo.completedAt.toLocaleDateString()}</p>
           )}
         </div>
         <div className="flex gap-1">
