@@ -3,6 +3,7 @@
 import type React from "react"
 
 import { useEffect, useState } from "react"
+import Link from "next/link"
 import { supabase } from "@/lib/supabase"
 import { toast } from "@/hooks/use-toast"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -303,17 +304,21 @@ export function SleepTracker({ isDashboard = false }: { isDashboard?: boolean })
                 <div className="text-xs text-muted-foreground">
                   {todaysSleep.bedtime} → {todaysSleep.wakeTime}
                 </div>
-                <Button variant="outline" size="sm" className="w-full bg-transparent">
-                  View Sleep Details
-                </Button>
+                <Link href="/sleep">
+                  <Button variant="outline" size="sm" className="w-full bg-transparent">
+                    View Sleep Details
+                  </Button>
+                </Link>
               </div>
             ) : (
               <div className="text-center space-y-3">
                 <div className="text-4xl opacity-50">🌙</div>
                 <p className="text-muted-foreground">No sleep logged today</p>
-                <Button size="sm" className="w-full">
-                  Log Sleep
-                </Button>
+                <Link href="/sleep">
+                  <Button size="sm" className="w-full">
+                    Log Sleep
+                  </Button>
+                </Link>
               </div>
             )}
           </CardContent>

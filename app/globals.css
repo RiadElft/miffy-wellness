@@ -4,14 +4,14 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  /* Miffy-themed color palette with warm yellows and soft pastels */
+  /* Yasmine-themed color palette with warm yellows and soft pastels */
   --background: oklch(1 0 0);
   --foreground: oklch(0.4 0 0);
   --card: oklch(0.99 0 0);
   --card-foreground: oklch(0.4 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.4 0 0);
-  --primary: oklch(0.8 0.15 85); /* Miffy warm yellow */
+  --primary: oklch(0.8 0.15 85); /* Yasmine warm yellow */
   --primary-foreground: oklch(0.2 0 0);
   --secondary: oklch(0.96 0 0);
   --secondary-foreground: oklch(0.4 0 0);
@@ -31,12 +31,12 @@
   --chart-5: oklch(0.65 0.18 40);
   --radius: 1rem;
 
-  /* Custom Miffy theme colors */
-  --miffy-yellow: oklch(0.8 0.15 85);
-  --miffy-pink: oklch(0.85 0.12 330);
-  --miffy-blue: oklch(0.7 0.15 220);
-  --miffy-cream: oklch(0.95 0.02 85);
-  --miffy-orange: oklch(0.75 0.18 40);
+  /* Custom Yasmine theme colors */
+  --yasmine-yellow: oklch(0.8 0.15 85);
+  --yasmine-pink: oklch(0.85 0.12 330);
+  --yasmine-blue: oklch(0.7 0.15 220);
+  --yasmine-cream: oklch(0.95 0.02 85);
+  --yasmine-orange: oklch(0.75 0.18 40);
 
   /* Added sidebar colors */
   --sidebar: oklch(0.985 0 0);
@@ -82,6 +82,10 @@
 }
 
 /* Custom theme variants for user customization */
+.theme-default {
+  /* Default Yasmine yellow theme - no changes needed */
+}
+
 .theme-pink {
   --primary: oklch(0.85 0.12 330);
   --accent: oklch(0.8 0.15 85);
@@ -89,6 +93,16 @@
 
 .theme-blue {
   --primary: oklch(0.7 0.15 220);
+  --accent: oklch(0.85 0.12 330);
+}
+
+.theme-green {
+  --primary: oklch(0.75 0.1 160);
+  --accent: oklch(0.8 0.15 85);
+}
+
+.theme-purple {
+  --primary: oklch(0.8 0.12 280);
   --accent: oklch(0.85 0.12 330);
 }
 

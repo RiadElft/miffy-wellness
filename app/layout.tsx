@@ -6,6 +6,7 @@ import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from "@/components/ui/toaster"
 import { AuthProvider } from "@/components/auth-provider"
 import { AuthGuard } from "@/components/auth-guard"
+import { MoodProvider } from "@/components/mood-context"
 import { AppFrame } from "@/components/app-frame"
 
 const spaceGrotesk = Space_Grotesk({
@@ -21,7 +22,7 @@ const dmSans = DM_Sans({
 })
 
 export const metadata: Metadata = {
-  title: "Miffy's Mood Garden",
+  title: "Yasmine's Garden",
   description: "Your gentle companion for wellness tracking",
   generator: "v0.app",
 }
@@ -37,7 +38,9 @@ export default function RootLayout({
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false} disableTransitionOnChange={false}>
           <AuthProvider>
             <AuthGuard>
-              <AppFrame>{children}</AppFrame>
+              <MoodProvider>
+                <AppFrame>{children}</AppFrame>
+              </MoodProvider>
             </AuthGuard>
             <Toaster />
           </AuthProvider>

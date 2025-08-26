@@ -3,7 +3,7 @@
 import { useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { MiffyIcon } from "@/components/miffy-icon"
+import { YasmineIcon } from "@/components/yasmine-icon"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { Home, Heart, Pill, Moon, Calendar, CheckSquare, Menu, X, ChevronLeft, ChevronRight, Users, LogOut } from "lucide-react"
@@ -14,7 +14,7 @@ const navigation = [
     name: "Dashboard",
     href: "/",
     icon: Home,
-    description: "Your wellness overview",
+    description: "Your garden overview",
   },
   {
     name: "Mood Garden",
@@ -97,10 +97,10 @@ export function Sidebar() {
           {/* Header */}
           <div className={cn("p-6 border-b", !isExpanded && "md:p-3")}>
             <div className="flex items-center gap-3">
-              <MiffyIcon className={cn("w-10 h-10", !isExpanded && "md:w-8 md:h-8")} />
+              <YasmineIcon className={cn("w-10 h-10", !isExpanded && "md:w-8 md:h-8")} />
               <div className={cn("transition-opacity duration-200", !isExpanded && "md:hidden")}>
-                <h2 className="font-bold text-xl">Miffy's Garden</h2>
-                <p className="text-sm text-muted-foreground">Wellness companion</p>
+                <h2 className="font-bold text-xl">Yasmine's Garden</h2>
+                <p className="text-sm text-muted-foreground">Garden companion</p>
               </div>
             </div>
           </div>

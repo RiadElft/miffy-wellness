@@ -49,8 +49,8 @@ export function AppFrame({ children }: AppFrameProps) {
           <div className="px-4 py-4 flex items-center justify-between">
             <div className="md:hidden" />
             <div className="hidden md:block">
-              <h1 className="text-xl font-bold">Miffy's Mood Garden</h1>
-              <p className="text-sm text-muted-foreground">Your gentle wellness companion</p>
+              <h1 className="text-xl font-bold">Yasmine's Garden</h1>
+              <p className="text-sm text-muted-foreground">Your gentle garden companion</p>
             </div>
             <ThemeSelector />
           </div>

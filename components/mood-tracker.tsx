@@ -1,8 +1,10 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import Link from "next/link"
 import { supabase } from "@/lib/supabase"
 import { toast } from "@/hooks/use-toast"
+import { useMood } from "./mood-context"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
@@ -88,6 +90,7 @@ export function MoodTracker({ isDashboard = false }: { isDashboard?: boolean }) 
   const [note, setNote] = useState("")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingEntry, setEditingEntry] = useState<MoodEntry | null>(null)
+  const { setCurrentMood } = useMood()
 
   // Load recent moods from Supabase
   useEffect(() => {
@@ -138,6 +141,11 @@ export function MoodTracker({ isDashboard = false }: { isDashboard?: boolean }) 
       setMoodHistory(moodHistory.map(entry => entry.id === editingEntry.id ? newEntry : entry))
     } else {
       setMoodHistory([newEntry, ...moodHistory])
+    }
+
+    // Update the mood context when a new mood is saved (only for today's mood)
+    if (!editingEntry) {
+      setCurrentMood(selectedMood)
     }
 
     // Cloud persist if linked and authenticated
@@ -239,15 +247,19 @@ export function MoodTracker({ isDashboard = false }: { isDashboard?: boolean }) 
                     <p className="text-sm text-muted-foreground">{todaysMood.mood.description}</p>
                     {todaysMood.note && <p className="text-sm text-muted-foreground mt-2 italic font-medium">"{todaysMood.note}"</p>}
                   </div>
-                  <Button variant="outline" className="w-full bg-transparent">
-                    View Mood Details
-                  </Button>
+                  <Link href="/mood">
+                    <Button variant="outline" className="w-full bg-transparent">
+                      View Mood Details
+                    </Button>
+                  </Link>
                 </>
               ) : (
                 <>
                   <div className="text-6xl opacity-50">☁️</div>
                   <p className="text-muted-foreground">No mood logged today</p>
-                  <Button className="w-full">Log Your Mood</Button>
+                  <Link href="/mood">
+                    <Button className="w-full">Log Your Mood</Button>
+                  </Link>
                 </>
               )}
             </div>
