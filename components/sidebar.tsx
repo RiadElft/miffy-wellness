@@ -6,8 +6,7 @@ import { usePathname } from "next/navigation"
 import { YasmineIcon } from "@/components/yasmine-icon"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { Home, Heart, Pill, Moon, Calendar, CheckSquare, Menu, X, ChevronLeft, ChevronRight, Users, LogOut } from "lucide-react"
-import { useAuth } from "@/components/auth-provider"
+import { Home, Heart, Pill, Moon, Calendar, CheckSquare, Menu, X, ChevronLeft, ChevronRight, Users } from "lucide-react"
 
 const navigation = [
   {
@@ -58,7 +57,6 @@ export function Sidebar() {
   const [isOpen, setIsOpen] = useState(false)
   const [isExpanded, setIsExpanded] = useState(true) // Added state for desktop expand/collapse
   const pathname = usePathname()
-  const { signOut } = useAuth()
 
   return (
     <>
@@ -153,19 +151,6 @@ export function Sidebar() {
             <div className={cn("hidden text-center", !isExpanded && "md:block")}>
               <div className="text-lg">🌱</div>
             </div>
-
-            <Button
-              variant="ghost"
-              onClick={signOut}
-              className={cn(
-                "mt-4 w-full justify-start gap-3",
-                !isExpanded && "md:w-full md:justify-center",
-              )}
-              title={!isExpanded ? "Sign out" : undefined}
-            >
-              <LogOut className="h-5 w-5" />
-              <span className={cn(!isExpanded && "md:hidden")}>Sign out</span>
-            </Button>
           </div>
         </div>
       </aside>

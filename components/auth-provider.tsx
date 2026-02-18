@@ -1,7 +1,6 @@
 "use client"
 
 import { createContext, useContext, useEffect, useState } from "react"
-import { useRouter, usePathname } from "next/navigation"
 import { supabase } from "@/lib/supabase"
 import { User } from "@supabase/supabase-js"
 
@@ -29,53 +28,32 @@ interface AuthProviderProps {
   children: React.ReactNode
 }
 
+/** Demo mode: no redirects, auth state kept for components that use it */
 export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
-  const router = useRouter()
-  const pathname = usePathname()
-
-  // Public routes that don't require authentication
-  const publicRoutes = ["/login", "/register", "/auth/callback"]
-  const isPublicRoute = publicRoutes.includes(pathname)
 
   useEffect(() => {
-    // Get initial session
     const getInitialSession = async () => {
       const { data: { session } } = await supabase.auth.getSession()
       setUser(session?.user ?? null)
       setLoading(false)
-
-      // Redirect logic
-      if (!session?.user && !isPublicRoute) {
-        router.push("/login")
-      } else if (session?.user && (pathname === "/login" || pathname === "/register")) {
-        router.push("/")
-      }
     }
 
     getInitialSession()
 
-    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      async (_event, session) => {
         setUser(session?.user ?? null)
         setLoading(false)
-
-        if (event === "SIGNED_IN" && (pathname === "/login" || pathname === "/register")) {
-          router.push("/")
-        } else if (event === "SIGNED_OUT" && !isPublicRoute) {
-          router.push("/login")
-        }
       }
     )
 
     return () => subscription.unsubscribe()
-  }, [router, pathname, isPublicRoute])
+  }, [])
 
   const signOut = async () => {
     await supabase.auth.signOut()
-    router.push("/login")
   }
 
   const value = {

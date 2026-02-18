@@ -1,43 +1,15 @@
 "use client"
 
 import React from "react"
-import { usePathname } from "next/navigation"
-import { useAuth } from "@/components/auth-provider"
 import { Sidebar } from "@/components/sidebar"
 import { ThemeSelector } from "@/components/theme-selector"
-import { Card, CardContent } from "@/components/ui/card"
-import { Loader2 } from "lucide-react"
 
 interface AppFrameProps {
   children: React.ReactNode
 }
 
+/** Demo mode: always show full app shell with sidebar */
 export function AppFrame({ children }: AppFrameProps) {
-  const { user, loading } = useAuth()
-  const pathname = usePathname()
-
-  const publicRoutes = ["/login", "/register", "/auth/callback"]
-  const isPublicRoute = publicRoutes.includes(pathname)
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 to-pink-50">
-        <Card className="w-full max-w-md">
-          <CardContent className="flex flex-col items-center justify-center p-8 space-y-4">
-            <Loader2 className="h-8 w-8 animate-spin text-purple-600" />
-            <p className="text-muted-foreground">Loading...</p>
-          </CardContent>
-        </Card>
-      </div>
-    )
-  }
-
-  // Render auth pages without the app chrome
-  if (!user && isPublicRoute) {
-    return <>{children}</>
-  }
-
-  // For all other cases (authenticated), render the full app shell
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-primary/5 to-accent/10">
       <Sidebar />
